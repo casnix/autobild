@@ -24,6 +24,7 @@ use Parse::CSV;
 
 use GlobalEnvironment;
 use Debugger;
+use Autobilder::FSModel;
 
 package Autobilder;
 
@@ -34,23 +35,123 @@ use constant lclDebugger => Debugger->new('Autobilder');
 #
 
 #
-# Private functions
+# Private functions declared
 my $PopulatePaths;
+my $PopulateGlobals;
+my $PopulatePrivate;
+my $PopulateEntries;
+my $PopulatePublics;
+my $PopulateFooters;
+
+my $Message;
+my %Messenger;
+#
+#
+
+#
+# Private functions implemented
+
+# void $Message($ or %) -- Prints a message depending on level.
+#-- Arguments: Two uses:
+# 1-           $msg, the message to print at level 1.
+# 2-           %msg => {level => n, msg => str}, a hash defining level and msg to print at specified msg.
+#- Returns: Nothing.
+$Message = sub {
+  if($GlobalEnvironment::Silent) return;
+
+  if(ref eq "SCALAR") $Messenger{Levels}->[1](shift);
+  if(ref eq "HASH") $Messenger{Levels}->[$_[0]->{level}]($_[0]->{msg});
+}
+
+# void $PopulatePaths(void) -- Populate parts paths.
+#-- Arguments: None.
+#-- Returns: Nothing.
 $PopulatePaths = sub {
   lclDebugger->Register('$PopulatePaths');
   lclDebugger->OpenHere();
 
+  my $this = shift;
+
+  $this->{__fsModel} = Autobilder::FSModel->new($this->{__inputsrc});
+  $this->{private}->{__fsModel} = Autobilder::FSModel->new($this->{__inputsrc}."/_");
+
+  my $privModel = ${ $this->{private}->{__fsModel} };
+  my $nodeModel = ${ $this->{__fsModel} };
+
+  $this->$PopulateHeaders(\$nodeModel);
+  $this->$PopulateGlobals(\$nodeModel);
+  $this->$PopulatePrivate(\$privModel);
+  $this->$PopulateEntries(\$nodeModel);
+  $this->$PopulatePublics(\$nodeModel);
+  $this->$PopulateFooters(\$nodeModel);
+
+  lclDebugger->CloseHere();
+}
+
+# void $PopulateHeaders($) -- Populate header paths
+#-- Arguments: \$nodeModel, a reference to the FSModel.
+#-- Returns: Nothing.
+$PopulateHeaders = sub {
+  lclDebugger->Register('$PopulateHeaders');
+  lclDebugger->OpenHere();
+
+  my $this = shift;
+  my $node = shift;
+
   # Populate LICENSE headers
-
+  $this->{paths}->{LICENSE} = ${ $node }->FilterFor('license.headers');
   # Populate INCLUDE headers
-
+  $this->{paths}->{INCLUDE} = ${ $node }->FilterFor('include.headers');
   # Populate CONDITIONAL INCLUDE headers
+  $this->{paths}->{CONDITIONAL_INCLUDE} = ${ $node }->FilterFor('headers.conditional');
+
+  lclDebugger->CloseHere();
+}
+
+# void $PopulateGlobals($) -- Populate global paths
+#-- Arguments: \$nodeModel, a reference to the FSModel.
+#-- Returns: Nothing.
+$PopulateGlobals = sub {
+  lclDebugger->Register('$PopulateGlobals');
+  lclDebugger->OpenHere();
+
+  my $this = shift;
+  my $node = shift;
 
   # Populate EXTERNAL GLOBAL variables
-
+  $this->{paths}->{EXTGLBLVAR} = $nodeModel->FilterFor('global.vars.external');
   # Populate INTERNAL GLOBAL variables
+  $this->{paths}->{INTGLBLVAR} = $nodeModel->FilterFor('global.vars.internal');
+
+  lclDebugger->CloseHere();
+}
+
+# void $PopulatePrivate($) -- Populate private paths.
+#-- Arguments: \$privModel, a reference to the FSModel.
+#-- Returns: Nothing.
+$PopulatePrivate = sub {
+  lclDebugger->Register('$PopulatePrivate');
+  lclDebugger->OpenHere();
+
+  my $this = shift;
+  my $node = shift;
+
+  # Populate scalars
+  my @scalars = ${ $node }->FilterFor('DollarSign');
+  my $scNode = -1;
+  $scNode = Autobilder::FSModel->new($this->{__inputsrc}."_/".$scalars[0]) unless $#scalars < 0;
+
+  # Populate lists
+  my @lists = ${ $node }->FilterFor('ArraySign');
+  my $liNode = -1;
+  $liNode = Autobilder::FSModel->new($this->{__inputsrc}."_/".$lists[0]) unless $#lists < 0;
 
   # Populate PRIVATE functions
+  $this->{paths}->{private}->{SCALAR}->{functions} = -1;
+  $this->{paths}->{private}->{SCALAR}->{functions} = $scNode->FilterFor('code.sub') unless $scNode < 0;
+
+  $this->{paths}->{private}->{LIST}->{functions} = -1;
+  $this->{paths}->{private}->{LIST}->{functions} = $liNode->FilterFor('code.sub') unless $liNode < 0;
 
   # Populate ENTRY point
 
@@ -75,8 +176,26 @@ sub new {
   my $class = shift;
 
   my $self = {
-    __inputsrc => shift;
-    __outputsrc => shift;
+    __inputsrc => shift,
+    __outputsrc => shift,
+    __fsModel => "",
+    private => {
+      __fsModel => "",
+      SCALAR => "",
+      LIST => "",
+    },
+    parts => {
+      private => {
+        SCALAR => { },
+        LIST => { },
+      },
+    },
+    paths => {
+      private => {
+        SCALAR => { },
+        LIST => { },
+      },
+    },
   };
 
   lclDebugger->CloseHere();
@@ -95,8 +214,8 @@ sub Init {
   # File paths
   $this->{paths} = { };
   $this->$PopulatePaths();
-
 }
+
 # int MashParts(class) -- Mash parts together to make a source file.
 #-- Arguments: None.
 #-- Returns: $status, the status.
@@ -108,3 +227,6 @@ sub MashParts {
   # License header
 
 }
+
+#
+#

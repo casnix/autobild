@@ -21,5 +21,7 @@ use warnings;
 use boolean ':all';
 
 my $DebuggerOn = false;
+my $RunSilent = false;
+my $Silent = false;
 
 1;

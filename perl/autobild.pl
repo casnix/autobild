@@ -87,7 +87,7 @@ sub ProcessArguments {
 
   # Weirdly works online but not in CLI grep...?
   my $srcSwitches = qr/-(i|o)/;
-  my $cmdSwitches = qr/-(w|h|v|d|-license|-help|-version|-debugger)/;
+  my $cmdSwitches = qr/-(w|h|v|d|s|S|-license|-help|-version|-debugger|-silent|-run-silent)/;
 
   # Iterate through arguments
   my $boolSkip = false;
@@ -110,6 +110,8 @@ sub ProcessArguments {
     UsageDie() if $argv->[$argumentIndex] eq "-h" || $argv->[$argumentIndex] eq "--help";
     PrintVersion() if $argv->[$argumentIndex] eq "-v" || $argv->[$argumentIndex] eq "--version";
     EnableDebugger() if $argv->[$argumentIndex] eq "-d" || $argv->[$argumentIndex] eq "--debugger";
+    SetSilent() if $argv->[$argumentIndex] eq "-s" || $argv->[$argumentIndex] eq "--silent";
+    RunSilent() if $argv->[$argumentIndex] eq "-S" || $argv->[$argumentIndex] eq "--run-silent";
 
     UsageDie() unless $argv->[$argumentIndex] =~ $cmdSwitches;
   }
@@ -125,13 +127,15 @@ sub UsageDie {
   lclDebugger->Register('UsageDie');
   lclDebugger->OpenHere();
 
-  die ("Usage: autobild.pl [-whvd|-license|-help|-version|-debugger] [-(i|o)] filepath\n".
+  die ("Usage: autobild.pl [-whvdsS|-<long argument>] [-(i|o)] filepath\n".
     "Options: -i                            The input source parts directory path.\n".
     "         -o                            The output source file path.\n".
     "         -w --license                  Print GPLv3.0 notice.\n".
     "         -h --help                     Print usage message.\n".
     "         -v --version                  Print version.\n".
     "         -d --debugger                 Enable the built in debugger (for autobild developers).\n".
+    "         -s --silent                   Run with no output messaging.\n".
+    "         -S --run-silent               Run with minimal output messaging.\n".
     "Created by Matt Rienzo, 2019.\n");
 
   lclDebugger->CloseHere();
@@ -174,4 +178,18 @@ sub PrintVersion {
 #-- Returns: Nothing.
 sub EnableDebugger {
   $GlobalEnvironment::DebuggerOn = true;
+}
+
+# void SetSilent(void) -- Enables silent mode.
+#-- Arguments: None.
+#-- Returns: Nothing.
+sub SetSilent {
+  $GlobalEnvironment::Silent = true;
+}
+
+# void RunSilent(void) -- Enables minimal silent mode.
+#-- Arguments: None.
+#-- Returns: Nothing.
+sub SetSilent {
+  $GlobalEnvironment::RunSilent = true;
 }
